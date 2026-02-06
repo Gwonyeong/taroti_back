@@ -1,0 +1,50 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "postinstall": "prisma generate",
+    "build": "prisma generate",
+    "start": "node server.js",
+    "dev": "pm2 start ecosystem.config.js --watch && pm2 logs",
+    "dev:nodemon": "nodemon server.js",
+    "start:prod": "NODE_ENV=production node server.js",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:start:prod": "pm2 start ecosystem.config.js --env production",
+    "pm2:stop": "pm2 stop taroti-backend",
+    "pm2:restart": "pm2 restart taroti-backend",
+    "pm2:reload": "pm2 reload taroti-backend",
+    "pm2:delete": "pm2 delete taroti-backend",
+    "pm2:logs": "pm2 logs taroti-backend",
+    "pm2:status": "pm2 status",
+    "deploy": "vercel --prod",
+    "deploy:preview": "vercel",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/client": "^6.18.0",
+    "@supabase/supabase-js": "^2.84.0",
+    "axios": "^1.13.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "lucide-react": "^0.552.0",
+    "multer": "^2.0.2",
+    "node-cron": "^4.2.1",
+    "playwright": "^1.57.0",
+    "tailwind-merge": "^3.3.1",
+    "uuid": "^8.3.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10",
+    "pm2": "^6.0.14",
+    "prisma": "^6.18.0"
+  }
+}

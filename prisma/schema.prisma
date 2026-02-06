@@ -1,0 +1,546 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-1.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model LandingUser {
+  id              Int      @id @default(autoincrement())
+  birthDate       String
+  gender          String
+  mbti            String
+  purchaseClicked Boolean  @default(false)
+  email           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("landingUser")
+}
+
+model LandingUserV2 {
+  id              Int      @id @default(autoincrement())
+  birthDate       String
+  gender          String
+  mbti            String
+  purchaseClicked Boolean  @default(false)
+  email           String?
+  selectedCard    Int?     // 선택한 카드 번호
+  isRestarted     Boolean  @default(false) // 다시하기 버튼 클릭 여부
+  feedback        Json?    // 사용자 피드백 데이터
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("landingUserV2")
+}
+
+model Banner {
+  id               Int      @id @default(autoincrement())
+  title            String
+  description      String?
+  pc_image_url     String
+  mobile_image_url String?
+  link_url         String?
+  active           Boolean  @default(true)
+  sort_order       Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("banners")
+}
+
+model Content {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String
+  image_url   String
+  link_url    String?
+  active      Boolean  @default(true)
+  sort_order  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 관계 설정
+  recommendations ContentRecommendation[]
+
+  @@map("contents")
+}
+model User {
+  id                Int      @id @default(autoincrement())
+  kakaoId           String?  @unique
+  email             String?
+  nickname          String?
+  profileImageUrl   String?
+  gender            String?
+  mbti              String?
+  birthDate         String?
+
+  // 토스 로그인 관련 필드
+  tossUserKey       String?  @unique    // 토스 사용자 고유 키
+  tossName          String?             // 복호화된 이름
+  tossCi            String?  @unique    // 복호화된 CI (본인인증 식별자)
+  tossPhone         String?             // 복호화된 전화번호
+  tossBirthday      String?             // 복호화된 생년월일
+  tossGender        String?             // 복호화된 성별
+  tossNationality   String?             // 복호화된 국적
+  tossLastLogin     DateTime?           // 마지막 토스 로그인 시간
+  tossLoggedOut     Boolean  @default(false)  // 토스 연결 해제 상태
+
+  mindReadings      MindReading[]
+  decemberFortunes  DecemberFortune[]
+  newYearFortunes2026 NewYearFortune2026[]
+  fortuneSessions   FortuneSession[]
+  purchases         Purchase[]
+  pointRewards      PointReward[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("users")
+}
+
+// 인앱 구매 기록 모델
+model Purchase {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 주문 정보
+  orderId         String   @unique  // 토스 주문 ID
+  sku             String              // 상품 SKU (환경변수 이름과 매칭)
+  productType     String              // 상품 유형 (AD_FREE 등)
+
+  // 결제 상태
+  status          String   @default("COMPLETED")  // PENDING, COMPLETED, FAILED, REFUNDED
+  amount          Int?                // 결제 금액 (원)
+
+  // 메타데이터
+  metadata        Json?               // 추가 정보
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("purchases")
+}
+
+model MindReading {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 사용자 프로필 정보 (스냅샷)
+  gender          String
+  mbti            String
+  birthDate       String
+
+  // 마음 읽기 세션 정보
+  selectedCard    Int?
+  sessionData     Json?     // 채팅 내용, 상황 설명 등
+  isCompleted     Boolean   @default(false)
+
+  // 결제 관련 (향후 확장)
+  isPaid          Boolean   @default(false)
+  paymentId       String?
+  paymentClicked  Boolean   @default(false)  // 결제 버튼 클릭 여부
+  interestShown   Boolean   @default(false)  // 관심 표하기 클릭 여부
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("mind_readings")
+}
+
+// ⚠️ DEPRECATED: 이 모델은 더 이상 사용되지 않습니다!
+// 2025-12-15부터 FortuneSession으로 통합되었습니다.
+// 새로운 12월 운세는 FortuneTemplate(templateKey: "december-fortune")과
+// FortuneSession을 사용하세요.
+//
+// 기존 데이터는 scripts/migrate-fortune-data.js를 통해 마이그레이션 완료
+// 이 모델은 기존 데이터 호환성을 위해서만 유지됩니다.
+model DecemberFortune {
+  id              Int      @id @default(autoincrement())
+  userId          Int?
+  user            User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 12월 운세 관련 정보
+  fortuneType     String   // 학업운, 금전운, 기본운
+  selectedCard    Int      // 선택한 카드 번호 (0-10)
+
+  // 결과 데이터 (JSON으로 저장, 추후 확장 가능)
+  fortuneData     Json?    // 운세 해석, 상세 설명 등
+
+  // 결제 관련 (향후 확장)
+  isPaid          Boolean   @default(false)
+  paymentId       String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("december_fortunes")
+}
+
+// ⚠️ DEPRECATED: 이 모델은 더 이상 사용되지 않습니다!
+// 2025-12-15부터 FortuneSession으로 통합되었습니다.
+// 새로운 2026년 신년 운세는 FortuneTemplate(templateKey: "newyear-2026")과
+// FortuneSession을 사용하세요.
+//
+// 기존 데이터는 scripts/migrate-fortune-data.js를 통해 마이그레이션 완료
+// 이 모델은 기존 데이터 호환성을 위해서만 유지됩니다.
+model NewYearFortune2026 {
+  id              Int      @id @default(autoincrement())
+  userId          Int?
+  user            User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 2026년 신년 운세 관련 정보
+  fortuneType     String   // "2026년 상반기 운세"
+  selectedCard    Int      // 선택한 카드 번호 (0-21)
+  year            Int      @default(2026)
+  period          String   @default("상반기")
+
+  // 결과 데이터 (JSON으로 저장)
+  fortuneData     Json?    // 운세 해석, 상세 설명 등
+
+  // 결제 관련 (향후 확장)
+  isPaid          Boolean   @default(false)
+  paymentId       String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("newyear_fortunes_2026")
+}
+
+model ShareLink {
+  id                Int      @id @default(autoincrement())
+  shareId           String   @unique // UUID
+  originalFortuneId Int      @unique // december_fortunes의 id (하나의 운세당 하나의 공유 링크)
+  fortuneData       Json     // 공유할 운세 데이터
+  metadata          Json?    // 메타태그 데이터
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("share_links")
+}
+
+model ContentRecommendation {
+  id          Int      @id @default(autoincrement())
+  contentId   Int      // 콘텐츠 참조
+  content     Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  active      Boolean  @default(true) // 활성화 상태
+  sortOrder   Int      @default(0) // 정렬 순서
+  viewCount   Int      @default(0) // 조회수 (선택적)
+  clickCount  Int      @default(0) // 클릭수 (선택적)
+
+  // 표시 조건 (어떤 페이지에서 보여줄지)
+  showOnDecemberFortune Boolean @default(true) // 12월 운세 결과에서 표시
+  showOnNewYearFortune  Boolean @default(true) // 신년 운세 결과에서 표시
+  showOnMindReading     Boolean @default(false) // 마음읽기 결과에서 표시
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("content_recommendations")
+}
+
+model InstagramConnection {
+  id                    Int      @id @default(autoincrement())
+  accessToken           String   // Instagram 액세스 토큰
+  refreshToken          String?  // 리프레시 토큰 (필요한 경우)
+  tokenExpiresAt        DateTime // 토큰 만료 시간
+  instagramUserId       String   // Instagram 사용자 ID
+  instagramUsername     String?  // Instagram 사용자명
+  accountType           String?  // 계정 타입 (PERSONAL, BUSINESS)
+
+  // 권한 정보
+  permissions           Json?    // 부여받은 권한 목록
+
+  // 상태 정보
+  isActive              Boolean  @default(true)
+  lastRefreshedAt       DateTime @default(now())
+
+  // 설정 정보
+  autoPostingEnabled    Boolean  @default(false)
+  postingTime           String?  // 포스팅 시간 (HH:MM 형식)
+  postingFrequency      String   @default("daily") // daily, weekly, monthly
+  defaultHashtags       String?  // 기본 해시태그
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // 관계 설정
+  posts                 InstagramPost[]
+
+  @@map("instagram_connections")
+}
+
+model InstagramPost {
+  id                    Int      @id @default(autoincrement())
+  connectionId          Int
+  connection            InstagramConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  // Instagram API에서 받는 정보
+  instagramMediaId      String?  // Instagram에서 생성된 미디어 ID
+  instagramPostId       String?  // Instagram에서 생성된 포스트 ID
+
+  // 포스트 내용
+  caption               String   // 포스트 캡션
+  hashtags              String?  // 해시태그
+  imageUrl              String?  // 이미지 URL
+  mediaType             String   @default("IMAGE") // IMAGE, VIDEO, CAROUSEL_ALBUM
+
+  // 상태 정보
+  status                String   @default("DRAFT") // DRAFT, SCHEDULED, PUBLISHING, PUBLISHED, FAILED
+  scheduledAt           DateTime? // 예약 포스팅 시간
+  publishedAt           DateTime? // 실제 포스팅 시간
+
+  // 통계 정보 (선택적)
+  likeCount             Int      @default(0)
+  commentCount          Int      @default(0)
+  reachCount            Int      @default(0)
+  impressionCount       Int      @default(0)
+
+  // 오류 정보
+  errorMessage          String?
+  errorCode             String?
+
+  // 추가 메타데이터 (비디오 ID, 타입, 설정 등)
+  metadata              Json?
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@map("instagram_posts")
+}
+
+model DailyFortuneScheduler {
+  id            Int      @id @default(autoincrement())
+  isActive      Boolean  @default(false)
+  postingTime   String   @default("09:00")
+  fortuneTheme  String   @default("기본운")
+  settings      Json?    // 별자리별 설정
+  lastRunAt     DateTime?
+  nextRunAt     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("daily_fortune_scheduler")
+}
+
+model DailyFortunePost {
+  id            Int      @id @default(autoincrement())
+  zodiacSign    String   // 별자리 (양자리, 황소자리 등)
+  fortuneTheme  String   // 운세 주제 (기본운, 연애운, 재물운, 학업운)
+  tarotCard     Int      // 뽑힌 카드 번호 (0-21)
+  fortuneText   String   // 생성된 운세 내용
+  imageUrls     Json     // 생성된 이미지 URL 배열 [썸네일, 내용, 브랜딩]
+  instagramPostId String? // Instagram 게시물 ID
+  status        String   @default("PENDING") // PENDING, GENERATING, POSTED, FAILED
+  publishedAt   DateTime?
+  errorMessage  String?  // 실패 시 에러 메시지
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("daily_fortune_posts")
+}
+
+model FeaturedContent {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String
+  image_url   String
+  link_url    String?
+  category    String?  // 카테고리 (예: 운세, 심리테스트, 타로 등)
+  active      Boolean  @default(true)
+  sort_order  Int      @default(0)
+  view_count  Int      @default(0)
+  click_count Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("featured_contents")
+}
+
+model GeneratedVideo {
+  id            Int      @id @default(autoincrement())
+  title         String   // 영상 제목
+  filename      String   // 파일명 (UUID.webm)
+  publicUrl     String   // Supabase 공개 URL
+  storagePath   String   // Supabase 저장 경로
+  duration      Int      // 영상 길이 (ms)
+  videoType     String   @default("card-flip") // 영상 타입
+
+  // 카드 정보
+  selectedCards Json     // 선택된 카드 번호 배열
+
+  // 릴스 캡션
+  reelsCaption  String?  // 생성된 릴스용 캡션
+
+  // 메타데이터
+  metadata      Json?    // 추가 메타데이터 (해상도, 압축 등)
+
+  // 게시 상태
+  isPublished   Boolean  @default(false)
+  publishedAt   DateTime?
+
+  // 관계
+  images        GeneratedImage[] // 관련 생성된 이미지들
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("generated_videos")
+}
+
+model GeneratedImage {
+  id            Int      @id @default(autoincrement())
+  filename      String   // 파일명 (UUID.png)
+  publicUrl     String   // Supabase 공개 URL
+  storagePath   String   // Supabase 저장 경로
+  imageType     String   // 이미지 타입 (card-description, ending, carousel-card-back 등)
+
+  // 카드 관련 정보 (card-description 타입의 경우)
+  cardIndex     Int?     // 카드 순서 (1, 2, 3, 4)
+  cardNumber    Int?     // 타로 카드 번호 (0-21)
+  cardName      String?  // 카드 한글명
+  order         Int?     // 캐러셀용 이미지 순서 (1-7)
+
+  // 관계
+  videoId       Int?     // 관련 영상 ID
+  video         GeneratedVideo? @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  // 게시 상태
+  isPublished   Boolean  @default(false)
+  publishedAt   DateTime?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("generated_images")
+}
+
+// 캐릭터 모델 (운세 캐릭터 관리)
+model Character {
+  id              Int      @id @default(autoincrement())
+  name            String              // 캐릭터 이름 (예: "타로티", "별이")
+  imageSrc        String              // 캐릭터 이미지 경로
+  description     String?             // 캐릭터 설명
+  personality     String?             // 캐릭터 성격 설명 (채팅 말투 참고용)
+
+  // 기본 채팅 시나리오 템플릿
+  defaultMessageScenarios Json?       // 캐릭터별 기본 채팅 시나리오
+
+  // 메타데이터
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+
+  // 관계
+  fortuneTemplates FortuneTemplate[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("characters")
+}
+
+// 통합 운세 템플릿 모델
+model FortuneTemplate {
+  id              Int      @id @default(autoincrement())
+  templateKey     String   @unique  // "december-fortune", "newyear-2026" 등
+  title           String              // "12월 운세", "2026년 신년운세"
+  description     String?
+  category        String              // "monthly", "yearly", "special" 등
+  type            String   @default("default")  // "default" 또는 "mini" (미니 운세 템플릿)
+  imageUrl        String?             // 메인페이지 표시용 이미지 URL
+
+  // 콘텐츠 설정
+  characterInfo   Json                // 캐릭터 이름, 이미지, 설명 (임시로 유지)
+  characterId     Int?                // 사용할 캐릭터 ID (새로 추가)
+  character       Character?  @relation(fields: [characterId], references: [id], onDelete: SetNull)
+  messageScenarios Json?              // 채팅 시나리오
+  cardConfig      Json                // 사용할 카드 번호들, 선택 개수 등
+  requiredFields  Json?               // 필수 입력 필드들
+  fortuneSettings Json?               // 운세 생성 설정
+  resultTemplateData Json?            // 결과 페이지 구성 데이터 (카드별 해석, 레이아웃 등)
+
+  // UI/UX 설정
+  theme           Json?               // 색상, 스타일 설정
+
+  // 메타데이터
+  isActive        Boolean  @default(true)
+  isPremium       Boolean  @default(false)
+  sortOrder       Int      @default(0)
+
+  // 관계
+  sessions        FortuneSession[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("fortune_templates")
+}
+
+// 통합 운세 세션 모델
+model FortuneSession {
+  id              Int      @id @default(autoincrement())
+  templateId      Int
+  template        FortuneTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  userId          Int?
+  user            User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 세션 데이터
+  selectedCard    Int
+  fortuneData     Json?               // 운세 결과 데이터
+  sessionMetadata Json?               // 추가 메타데이터 (fortuneType 등)
+
+  // 🆕 사용자 프로필 스냅샷 (비로그인 사용자용)
+  userProfileSnapshot Json?           // { birthDate, gender, mbti } 등 입력받은 정보
+  isAnonymous     Boolean  @default(false)  // 비로그인 사용자 여부
+
+  // 결제/프리미엄 관련
+  isPremium       Boolean  @default(false)
+  isPaid          Boolean  @default(false)
+  paymentId       String?
+  paymentClicked  Boolean  @default(false)  // 결제 버튼 클릭 여부
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("fortune_sessions")
+}
+
+// 포인트 지급 기록 모델 (출석체크 보상)
+model PointReward {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 포인트 지급 정보
+  promotionCode   String              // 프로모션 코드 (예: "ATTENDANCE_DAILY")
+  amount          Int                 // 지급 금액 (원)
+  rewardType      String   @default("ATTENDANCE")  // ATTENDANCE, EVENT, REFERRAL 등
+
+  // 토스 API 응답 정보
+  rewardKey       String?  @unique   // 토스 API에서 반환하는 key
+  status          String   @default("PENDING")  // PENDING, SUCCESS, FAILED
+  errorCode       String?             // 실패 시 에러 코드
+  errorMessage    String?             // 실패 시 에러 메시지
+
+  // 날짜 정보 (중복 지급 방지용)
+  rewardDate      String              // YYYY-MM-DD 형식 (KST 기준)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // 하루에 한 번만 지급 가능하도록 복합 유니크 인덱스
+  @@unique([userId, rewardDate, rewardType])
+  @@map("point_rewards")
+}

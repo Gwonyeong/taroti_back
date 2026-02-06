@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TaroTI - 별자리 운세</title>
+    <link
+      href="https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2108@1.1/GowunDodum-Regular.woff"
+      rel="preload"
+      as="font"
+      type="font/woff"
+      crossorigin
+    />
+    <style>
+      @font-face {
+        font-family: "GowunDodum";
+        src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2108@1.1/GowunDodum-Regular.woff")
+          format("woff");
+        font-weight: normal;
+        font-display: swap;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "GowunDodum", -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Roboto, "Helvetica Neue", Arial, sans-serif;
+        width: 1080px;
+        height: 1350px;
+        overflow: hidden;
+        background-color: {{BACKGROUND_COLOR}};
+        color: {{TEXT_COLOR}};
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .container {
+        text-align: center;
+      }
+
+      .date-text {
+        font-size: 96px;
+        font-weight: bold;
+        margin-bottom: 40px;
+        line-height: 1.2;
+      }
+
+      .subtitle {
+        font-size: 64px;
+        font-weight: normal;
+        opacity: 1;
+        background-color: rgba(255, 255, 255, 0.9);
+        padding: 15px 30px;
+        border-radius: 40px;
+        display: inline-block;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="date-text">{{DATE_TEXT}}</div>
+      <div class="subtitle">별자리별 기본 운세</div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TaroTI - 별자리 운세 마무리</title>
+    <link
+      href="https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2108@1.1/GowunDodum-Regular.woff"
+      rel="preload"
+      as="font"
+      type="font/woff"
+      crossorigin
+    />
+    <style>
+      @font-face {
+        font-family: "GowunDodum";
+        src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2108@1.1/GowunDodum-Regular.woff")
+          format("woff");
+        font-weight: normal;
+        font-display: swap;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "GowunDodum", -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Roboto, "Helvetica Neue", Arial, sans-serif;
+        width: 1080px;
+        height: 1350px;
+        overflow: hidden;
+        position: relative;
+        background-image: url('http://localhost:5002/public/ending.png');
+        background-size: cover;
+        background-position: center;
+        color: white;
+      }
+
+      .overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1;
+      }
+
+      .container {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        padding: 80px 60px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        z-index: 2;
+      }
+
+      .logo {
+        font-size: 72px;
+        font-weight: bold;
+        color: white;
+        margin-bottom: 40px;
+        letter-spacing: 3px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+      }
+
+      .ending-title {
+        font-size: 56px;
+        font-weight: bold;
+        margin-bottom: 50px;
+        color: white;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+      }
+
+      .ending-message {
+        font-size: 36px;
+        line-height: 1.8;
+        color: white;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 50px 60px;
+        border-radius: 20px;
+        backdrop-filter: blur(10px);
+        max-width: 900px;
+        margin-bottom: 60px;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+      }
+
+      .cta-section {
+        background: rgba(0, 0, 0, 0.7);
+        padding: 40px 50px;
+        border-radius: 15px;
+        backdrop-filter: blur(10px);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+      }
+
+      .cta-title {
+        font-size: 42px;
+        font-weight: bold;
+        color: white;
+        margin-bottom: 20px;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+      }
+
+      .cta-text {
+        font-size: 32px;
+        color: white;
+        opacity: 0.9;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+      }
+
+      .footer {
+        position: absolute;
+        bottom: 40px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 28px;
+        color: white;
+        opacity: 0.8;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="overlay"></div>
+    <div class="container">
+      <div class="logo">TaroTI</div>
+      <div class="ending-message">
+        콘텐츠 이미지 두번 클릭 후,<br />
+        카드에 대한 의견을 댓글로 남기면<br />
+        행운이 찾아와요!
+      </div>
+
+      <div class="cta-section">
+        <div class="cta-title">⭐ 매일 업로드되는 별자리 운세</div>
+        <div class="cta-text">
+          팔로우 하고, 매일 아침,<br />
+          운세를 받아보세요!
+        </div>
+      </div>
+
+      <div class="footer">@TaroTI • 매일 업데이트</div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,15 @@
+node_modules/
+.env
+.env.local
+.env.*.local
+.env.scheduler
+.env.production
+npm-debug.log*
+.DS_Store
+dist/
+build/
+*.log
+.vscode/
+.idea/
+/generated/prisma
+.vercel
