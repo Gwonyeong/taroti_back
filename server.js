@@ -96,18 +96,7 @@ const getBasePath = () => {
 
 app.use(
   cors({
-    origin: [
-      "http://localhost:5001",
-      "http://localhost:5003",
-      "http://localhost:4001",
-      "http://192.168.200.191:4001",
-      "https://taroti-front.vercel.app",
-      "https://foxiest-jerome-untruly.ngrok-free.dev",
-      "https://apps-in-toss.toss.im",
-      "https://taroti.apps.tossmini.com",
-      "https://taroti.private-apps.tossmini.com",
-      "https://apps-in-toss.toss.im",
-    ],
+    origin: true,
     credentials: true,
   })
 );
