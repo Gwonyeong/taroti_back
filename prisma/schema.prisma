@@ -101,6 +101,7 @@ model User {
   fortuneSessions   FortuneSession[]
   purchases         Purchase[]
   pointRewards      PointReward[]
+  premiumContentSessions PremiumContentSession[]
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -116,7 +117,7 @@ model Purchase {
   // 주문 정보
   orderId         String   @unique  // 토스 주문 ID
   sku             String              // 상품 SKU (환경변수 이름과 매칭)
-  productType     String              // 상품 유형 (AD_FREE 등)
+  productType     String              // 상품 유형 (AD_FREE, PREMIUM_CONTENT 등)
 
   // 결제 상태
   status          String   @default("COMPLETED")  // PENDING, COMPLETED, FAILED, REFUNDED
@@ -124,6 +125,9 @@ model Purchase {
 
   // 메타데이터
   metadata        Json?               // 추가 정보
+
+  // 관계
+  premiumContentSession PremiumContentSession?  // 프리미엄 콘텐츠 세션 연결 (1:1)
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -515,6 +519,41 @@ model FortuneSession {
   updatedAt       DateTime @updatedAt
 
   @@map("fortune_sessions")
+}
+
+// 프리미엄 콘텐츠 세션 모델
+model PremiumContentSession {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 콘텐츠 유형
+  contentType     String              // "mind-reading", "compatibility" 등
+  contentKey      String?             // 콘텐츠 식별 키 (향후 확장용)
+
+  // 세션 데이터 (JSON으로 저장)
+  selectedCard    Int?                // 선택한 카드 번호
+  additionalCards Json?               // 추가 뽑은 카드 { card2: 8, card3: 6 }
+  cardData        Json?               // 카드 관련 추가 데이터
+  sessionData     Json?               // 채팅 내용, 상황 설명 등
+  resultData      Json?               // 결과 데이터
+
+  // 사용자 프로필 스냅샷
+  userProfile     Json?               // { birthDate, gender, mbti } 등
+
+  // 진행 상태
+  status          String   @default("IN_PROGRESS")  // IN_PROGRESS, COMPLETED, ABANDONED
+  isCompleted     Boolean  @default(false)
+
+  // 구매 관련
+  purchaseId      Int?     @unique   // 구매 연결 (1:1 관계)
+  purchase        Purchase? @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  isPurchased     Boolean  @default(false)  // 구매 여부
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("premium_content_sessions")
 }
 
 // 포인트 지급 기록 모델 (출석체크 보상)

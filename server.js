@@ -33,6 +33,7 @@ const charactersRoutes = require("./routes/characters");
 const cardsRoutes = require("./routes/cards");
 const shareRoutes = require("./routes/share");
 const pointRewardsRoutes = require("./routes/point-rewards");
+const premiumContentsRoutes = require("./routes/premium-contents");
 const {
   router: tossAuthRoutes,
   initPrisma: initTossAuthPrisma,
@@ -122,6 +123,7 @@ app.use("/api/characters", charactersRoutes);
 app.use("/api/share", shareRoutes);
 app.use("/api/cards", cardsRoutes);
 app.use("/api/point-rewards", pointRewardsRoutes);
+app.use("/api/premium-contents", premiumContentsRoutes);
 app.use("/api/auth", tossAuthRoutes);
 
 // Toss Auth 라우트에 Prisma 초기화

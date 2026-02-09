@@ -35,10 +35,11 @@ function buildPrompt(template, cards, userProfile, cardDataContext) {
   prompt = prompt.replace(/\{gender\}/g, userProfile.gender || "");
   prompt = prompt.replace(/\{birthDate\}/g, userProfile.birthDate || "");
 
-  // 카드 정보 주입 (2장)
+  // 카드 정보 주입 (3장)
   const cardEntries = [
     { key: "card1", card: cards.card1, data: cardDataContext?.card1Data },
     { key: "card2", card: cards.card2, data: cardDataContext?.card2Data },
+    { key: "card3", card: cards.card3, data: cardDataContext?.card3Data },
   ];
 
   for (const { key, card, data } of cardEntries) {
