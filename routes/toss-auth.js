@@ -341,7 +341,7 @@ router.get("/check-status", async (req, res) => {
  */
 router.post("/purchase/process", authenticateTossToken, async (req, res) => {
   try {
-    const { orderId, sku, amount } = req.body;
+    const { orderId, sku, amount, mindReadingId } = req.body;
     const userId = req.user.userId;
 
     if (!orderId || !sku) {
@@ -388,6 +388,64 @@ router.post("/purchase/process", authenticateTossToken, async (req, res) => {
         message: "광고 제거가 적용되었습니다.",
         productType: "AD_FREE",
         adFree: true,
+      });
+    }
+
+    // 마인드 리딩 구매 처리
+    const MIND_READING_SKU = process.env.MIND_READING_SKU;
+
+    if (sku === MIND_READING_SKU) {
+      const purchase = await prisma.purchase.create({
+        data: {
+          userId,
+          orderId,
+          sku,
+          productType: "MIND_READING",
+          status: "COMPLETED",
+          amount: amount || null,
+        },
+      });
+
+      // mindReadingId는 실제로 PremiumContentSession의 ID
+      if (mindReadingId) {
+        const parsedId = parseInt(mindReadingId);
+
+        // PremiumContentSession의 isPurchased 업데이트 및 purchase 연결
+        if (!isNaN(parsedId)) {
+          try {
+            await prisma.premiumContentSession.update({
+              where: { id: parsedId },
+              data: {
+                isPurchased: true,
+                purchaseId: purchase.id,
+              },
+            });
+            console.log(`PremiumContentSession ${parsedId} isPurchased 업데이트 완료`);
+          } catch (e) {
+            console.error("PremiumContentSession 업데이트 실패:", e.message);
+          }
+        }
+
+        // MindReading의 isPaid도 업데이트 시도 (기존 호환성)
+        if (!isNaN(parsedId)) {
+          try {
+            await prisma.mindReading.update({
+              where: { id: parsedId },
+              data: { isPaid: true },
+            });
+          } catch (e) {
+            // MindReading ID가 아닌 경우 무시
+          }
+        }
+      }
+
+      console.log(`마인드 리딩 구매 완료 - userId: ${userId}, orderId: ${orderId}`);
+
+      return res.json({
+        success: true,
+        message: "마인드 리딩 구매가 완료되었습니다.",
+        productType: "MIND_READING",
+        purchaseId: purchase.id,
       });
     }
 
