@@ -64,7 +64,23 @@ function buildPrompt(template, cards, userProfile, cardDataContext) {
   return prompt;
 }
 
-// Claude API로 해석 생성
+// 카드 번호로 카드 데이터 로드
+function loadCardDataContext(cards) {
+  const cardDescriptions = JSON.parse(
+    fs.readFileSync(path.join(__dirname, "../data/cardDescription.json"), "utf-8")
+  );
+  const cardList = cardDescriptions.TarotInterpretations;
+
+  const findCard = (number) => cardList.find((c) => c.CardNumber === String(number));
+
+  return {
+    card1Data: findCard(cards.card1?.number),
+    card2Data: findCard(cards.card2?.number),
+    card3Data: findCard(cards.card3?.number),
+  };
+}
+
+// Claude API로 해석 생성 (재시도 포함)
 async function generateInterpretation(cards, userProfile, cardDataContext) {
   const anthropic = new Anthropic();
 
@@ -75,21 +91,53 @@ async function generateInterpretation(cards, userProfile, cardDataContext) {
 
   const prompt = buildPrompt(promptTemplate, cards, userProfile, cardDataContext);
 
-  const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-5-20250929",
-    max_tokens: 4096,
-    messages: [{ role: "user", content: prompt }],
-  });
+  const MAX_RETRIES = 3;
+  let lastError = null;
 
-  const responseText = message.content[0].text;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`[Claude API] 호출 시도 ${attempt}/${MAX_RETRIES}`);
+      const message = await anthropic.messages.create({
+        model: "claude-sonnet-4-5-20250929",
+        max_tokens: 8192,
+        messages: [{ role: "user", content: prompt }],
+      });
 
-  // JSON 파싱 (코드 블록으로 감싸져 있을 수 있음)
-  const jsonMatch = responseText.match(/```json\s*([\s\S]*?)```/) || responseText.match(/\{[\s\S]*\}/);
-  const jsonStr = jsonMatch
-    ? (jsonMatch[1] || jsonMatch[0]).trim()
-    : responseText.trim();
+      // 응답이 max_tokens로 잘렸는지 확인
+      if (message.stop_reason === "max_tokens") {
+        throw new Error("응답이 토큰 제한으로 잘렸습니다. 재시도합니다.");
+      }
 
-  return JSON.parse(jsonStr);
+      console.log(`[Claude API] 응답 완료 (stop_reason: ${message.stop_reason}, output_tokens: ${message.usage?.output_tokens})`);
+      const responseText = message.content[0].text;
+
+      // JSON 파싱 (코드 블록으로 감싸져 있을 수 있음)
+      const jsonMatch = responseText.match(/```json\s*([\s\S]*?)```/) || responseText.match(/\{[\s\S]*\}/);
+      const jsonStr = jsonMatch
+        ? (jsonMatch[1] || jsonMatch[0]).trim()
+        : responseText.trim();
+
+      const parsed = JSON.parse(jsonStr);
+
+      // 필수 필드 검증
+      if (!parsed.deepPerception || !parsed.currentRelationship || !parsed.crisis || !parsed.future || !parsed.actionGuide || !parsed.compatibility || !parsed.finalMessage) {
+        throw new Error("응답에 필수 필드가 누락되었습니다.");
+      }
+
+      console.log(`[Claude API] 호출 성공 (시도 ${attempt})`);
+      return parsed;
+    } catch (error) {
+      lastError = error;
+      console.error(`[Claude API] 시도 ${attempt} 실패:`, error.message);
+      if (attempt < MAX_RETRIES) {
+        const delay = attempt * 2000; // 2초, 4초
+        console.log(`[Claude API] ${delay}ms 후 재시도...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  throw lastError;
 }
 
 // 인증 미들웨어 (X-User-ID 헤더 또는 Bearer 토큰)
@@ -443,8 +491,9 @@ router.post("/generate-interpretation", authenticateUser, async (req, res) => {
     } else {
       // 실제 Claude API 호출
       console.log("[generate-interpretation] Claude API 호출 시작");
+      const resolvedCardData = cardDataContext || loadCardDataContext(cards);
       try {
-        interpretation = await generateInterpretation(cards, userProfile, cardDataContext);
+        interpretation = await generateInterpretation(cards, userProfile, resolvedCardData);
         console.log("[generate-interpretation] Claude API 호출 성공");
       } catch (apiError) {
         console.error("[generate-interpretation] Claude API 호출 실패:", apiError.message);
@@ -456,15 +505,19 @@ router.post("/generate-interpretation", authenticateUser, async (req, res) => {
       }
     }
 
-    // PremiumContentSession 업데이트 (additionalCards + resultData 저장)
-    await prisma.premiumContentSession.update({
-      where: { id: session.id },
-      data: {
-        additionalCards: cards,
-        resultData: interpretation,
-      },
+    // 트랜잭션으로 결과 저장 (데이터 정합성 보장)
+    await prisma.$transaction(async (tx) => {
+      await tx.premiumContentSession.update({
+        where: { id: session.id },
+        data: {
+          additionalCards: cards,
+          resultData: interpretation,
+          status: "COMPLETED",
+        },
+      });
     });
 
+    console.log(`[generate-interpretation] 세션 ${session.id} 결과 저장 완료`);
     res.json({ success: true, data: interpretation });
   } catch (error) {
     console.error("Error generating interpretation:", error);
