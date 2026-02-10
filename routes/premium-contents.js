@@ -233,23 +233,36 @@ router.get("/sessions/:sessionId", authenticateUser, async (req, res) => {
 router.get("/sessions", authenticateUser, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { contentType, status } = req.query;
+    const { contentType, status, limit, offset } = req.query;
 
     const where = { userId };
     if (contentType) where.contentType = contentType;
     if (status) where.status = status;
 
-    const sessions = await prisma.premiumContentSession.findMany({
+    const findOptions = {
       where,
       include: {
         purchase: true,
       },
       orderBy: { createdAt: "desc" },
-    });
+    };
+
+    if (limit) {
+      findOptions.take = parseInt(limit);
+    }
+    if (offset) {
+      findOptions.skip = parseInt(offset);
+    }
+
+    const [sessions, total] = await Promise.all([
+      prisma.premiumContentSession.findMany(findOptions),
+      prisma.premiumContentSession.count({ where }),
+    ]);
 
     res.json({
       success: true,
       data: sessions,
+      total,
     });
   } catch (error) {
     console.error("Error fetching premium content sessions:", error);
