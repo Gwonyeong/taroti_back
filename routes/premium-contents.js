@@ -80,64 +80,94 @@ function loadCardDataContext(cards) {
   };
 }
 
-// Claude API로 해석 생성 (재시도 포함)
-async function generateInterpretation(cards, userProfile, cardDataContext) {
-  const anthropic = new Anthropic();
-
-  const promptTemplate = fs.readFileSync(
-    path.join(__dirname, "../prompts/mind-reading-premium.txt"),
-    "utf-8"
-  );
-
-  const prompt = buildPrompt(promptTemplate, cards, userProfile, cardDataContext);
-
+// 단일 Claude API 호출 (재시도 포함)
+async function callClaude(anthropic, prompt, maxTokens, groupName) {
   const MAX_RETRIES = 3;
   let lastError = null;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      console.log(`[Claude API] 호출 시도 ${attempt}/${MAX_RETRIES}`);
+      console.log(`[Claude API][${groupName}] 호출 시도 ${attempt}/${MAX_RETRIES}`);
       const message = await anthropic.messages.create({
         model: "claude-sonnet-4-5-20250929",
-        max_tokens: 8192,
+        max_tokens: maxTokens,
         messages: [{ role: "user", content: prompt }],
       });
 
-      // 응답이 max_tokens로 잘렸는지 확인
       if (message.stop_reason === "max_tokens") {
-        throw new Error("응답이 토큰 제한으로 잘렸습니다. 재시도합니다.");
+        throw new Error(`[${groupName}] 응답이 토큰 제한으로 잘렸습니다.`);
       }
 
-      console.log(`[Claude API] 응답 완료 (stop_reason: ${message.stop_reason}, output_tokens: ${message.usage?.output_tokens})`);
+      console.log(`[Claude API][${groupName}] 응답 완료 (stop_reason: ${message.stop_reason}, output_tokens: ${message.usage?.output_tokens})`);
       const responseText = message.content[0].text;
 
-      // JSON 파싱 (코드 블록으로 감싸져 있을 수 있음)
       const jsonMatch = responseText.match(/```json\s*([\s\S]*?)```/) || responseText.match(/\{[\s\S]*\}/);
       const jsonStr = jsonMatch
         ? (jsonMatch[1] || jsonMatch[0]).trim()
         : responseText.trim();
 
       const parsed = JSON.parse(jsonStr);
-
-      // 필수 필드 검증
-      if (!parsed.deepPerception || !parsed.currentRelationship || !parsed.crisis || !parsed.future || !parsed.actionGuide || !parsed.compatibility || !parsed.finalMessage) {
-        throw new Error("응답에 필수 필드가 누락되었습니다.");
-      }
-
-      console.log(`[Claude API] 호출 성공 (시도 ${attempt})`);
+      console.log(`[Claude API][${groupName}] 호출 성공 (시도 ${attempt})`);
       return parsed;
     } catch (error) {
       lastError = error;
-      console.error(`[Claude API] 시도 ${attempt} 실패:`, error.message);
+      console.error(`[Claude API][${groupName}] 시도 ${attempt} 실패:`, error.message);
       if (attempt < MAX_RETRIES) {
-        const delay = attempt * 2000; // 2초, 4초
-        console.log(`[Claude API] ${delay}ms 후 재시도...`);
+        const delay = attempt * 2000;
+        console.log(`[Claude API][${groupName}] ${delay}ms 후 재시도...`);
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
   }
 
   throw lastError;
+}
+
+// Claude API로 해석 생성 (3개 병렬 호출)
+async function generateInterpretation(cards, userProfile, cardDataContext) {
+  const anthropic = new Anthropic();
+
+  // 3개 그룹 프롬프트 로드
+  const promptTemplate1 = fs.readFileSync(
+    path.join(__dirname, "../prompts/mind-reading-premium-group1.txt"),
+    "utf-8"
+  );
+  const promptTemplate2 = fs.readFileSync(
+    path.join(__dirname, "../prompts/mind-reading-premium-group2.txt"),
+    "utf-8"
+  );
+  const promptTemplate3 = fs.readFileSync(
+    path.join(__dirname, "../prompts/mind-reading-premium-group3.txt"),
+    "utf-8"
+  );
+
+  const prompt1 = buildPrompt(promptTemplate1, cards, userProfile, cardDataContext);
+  const prompt2 = buildPrompt(promptTemplate2, cards, userProfile, cardDataContext);
+  const prompt3 = buildPrompt(promptTemplate3, cards, userProfile, cardDataContext);
+
+  console.log("[Claude API] 3개 그룹 병렬 호출 시작");
+  const startTime = Date.now();
+
+  const [group1, group2, group3] = await Promise.all([
+    callClaude(anthropic, prompt1, 4096, "Group1-deepPerception+currentRelationship"),
+    callClaude(anthropic, prompt2, 4096, "Group2-crisis+future"),
+    callClaude(anthropic, prompt3, 4096, "Group3-actionGuide+compatibility+finalMessage"),
+  ]);
+
+  const elapsed = Date.now() - startTime;
+  console.log(`[Claude API] 3개 그룹 병렬 호출 완료 (${elapsed}ms)`);
+
+  // 결과 병합
+  const interpretation = { ...group1, ...group2, ...group3 };
+
+  // 필수 필드 검증
+  const requiredFields = ["deepPerception", "currentRelationship", "crisis", "future", "actionGuide", "compatibility", "finalMessage"];
+  const missingFields = requiredFields.filter((field) => !interpretation[field]);
+  if (missingFields.length > 0) {
+    throw new Error(`응답에 필수 필드가 누락되었습니다: ${missingFields.join(", ")}`);
+  }
+
+  return interpretation;
 }
 
 // 인증 미들웨어 (X-User-ID 헤더 또는 Bearer 토큰)

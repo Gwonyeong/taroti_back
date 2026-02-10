@@ -154,6 +154,18 @@ router.get("/toss/user", async (req, res) => {
       userInfo.success?.userKey ||
       userInfo.userKey;
 
+    console.log("[toss-auth] userInfo keys:", Object.keys(userInfo));
+    console.log("[toss-auth] userInfo.success keys:", userInfo.success ? Object.keys(userInfo.success) : "no success");
+    console.log("[toss-auth] userKey:", userKey);
+
+    if (!userKey) {
+      console.error("[toss-auth] userKey를 찾을 수 없습니다. userInfo:", JSON.stringify(userInfo, null, 2));
+      return res.status(500).json({
+        resultType: "FAIL",
+        error: { message: "사용자 키를 확인할 수 없습니다." },
+      });
+    }
+
     // 3. 정보 새로고침 요청인 경우 (X-User-ID 헤더 있음) tossLoggedOut 체크
     const headerUserId = req.headers["x-user-id"];
     if (headerUserId) {
