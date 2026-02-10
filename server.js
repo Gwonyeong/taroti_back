@@ -10,6 +10,7 @@ require("dotenv").config({
 });
 
 console.log(`[ENV] Loaded ${envFile} | NODE_ENV=${process.env.NODE_ENV} | PORT=${process.env.PORT}`);
+console.log(`[ENV] ANTHROPIC_API_KEY=${process.env.ANTHROPIC_API_KEY ? "SET (" + process.env.ANTHROPIC_API_KEY.substring(0, 10) + "...)" : "NOT SET"}`);
 const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
