@@ -24,7 +24,7 @@ function getMbtiGroup(mbti) {
 }
 
 // 프롬프트 템플릿에 변수 주입
-function buildPrompt(template, cards, userProfile, cardDataContext) {
+function buildPrompt(template, cards, userProfile, cardDataContext, additionalInput) {
   const mbtiGroup = getMbtiGroup(userProfile.mbti);
   const formatArray = (arr) => Array.isArray(arr) ? arr.join(", ") : String(arr || "");
 
@@ -34,6 +34,9 @@ function buildPrompt(template, cards, userProfile, cardDataContext) {
   prompt = prompt.replace(/\{mbti\}/g, userProfile.mbti || "");
   prompt = prompt.replace(/\{gender\}/g, userProfile.gender || "");
   prompt = prompt.replace(/\{birthDate\}/g, userProfile.birthDate || "");
+
+  // 추가 입력 변수 주입 (이별 상황 등)
+  prompt = prompt.replace(/\{breakupSituation\}/g, additionalInput?.breakupSituation || "");
 
   // 카드 정보 주입 (3장)
   const cardEntries = [
@@ -123,45 +126,50 @@ async function callClaude(anthropic, prompt, maxTokens, groupName) {
   throw lastError;
 }
 
+// 콘텐츠 타입별 프롬프트 로더
+function loadPromptTemplates(contentType) {
+  const prefix = contentType;
+  return {
+    group1: fs.readFileSync(path.join(__dirname, `../prompts/${prefix}-premium-group1.txt`), "utf-8"),
+    group2: fs.readFileSync(path.join(__dirname, `../prompts/${prefix}-premium-group2.txt`), "utf-8"),
+    group3: fs.readFileSync(path.join(__dirname, `../prompts/${prefix}-premium-group3.txt`), "utf-8"),
+  };
+}
+
+// 콘텐츠 타입별 필수 필드 검증
+const REQUIRED_FIELDS = {
+  "mind-reading": ["deepPerception", "currentRelationship", "crisis", "future", "actionGuide", "compatibility", "finalMessage"],
+  "breakup-reunion": ["breakupAnalysis", "currentFeelings", "reunionPossibility", "healingGuide", "decision", "finalMessage"],
+};
+
 // Claude API로 해석 생성 (3개 병렬 호출)
-async function generateInterpretation(cards, userProfile, cardDataContext) {
+async function generateInterpretation(cards, userProfile, cardDataContext, contentType = "mind-reading", additionalInput = {}) {
   const anthropic = new Anthropic();
 
-  // 3개 그룹 프롬프트 로드
-  const promptTemplate1 = fs.readFileSync(
-    path.join(__dirname, "../prompts/mind-reading-premium-group1.txt"),
-    "utf-8"
-  );
-  const promptTemplate2 = fs.readFileSync(
-    path.join(__dirname, "../prompts/mind-reading-premium-group2.txt"),
-    "utf-8"
-  );
-  const promptTemplate3 = fs.readFileSync(
-    path.join(__dirname, "../prompts/mind-reading-premium-group3.txt"),
-    "utf-8"
-  );
+  // 콘텐츠 타입별 프롬프트 로드
+  const templates = loadPromptTemplates(contentType);
 
-  const prompt1 = buildPrompt(promptTemplate1, cards, userProfile, cardDataContext);
-  const prompt2 = buildPrompt(promptTemplate2, cards, userProfile, cardDataContext);
-  const prompt3 = buildPrompt(promptTemplate3, cards, userProfile, cardDataContext);
+  const prompt1 = buildPrompt(templates.group1, cards, userProfile, cardDataContext, additionalInput);
+  const prompt2 = buildPrompt(templates.group2, cards, userProfile, cardDataContext, additionalInput);
+  const prompt3 = buildPrompt(templates.group3, cards, userProfile, cardDataContext, additionalInput);
 
-  console.log("[Claude API] 3개 그룹 병렬 호출 시작");
+  console.log(`[Claude API][${contentType}] 3개 그룹 병렬 호출 시작`);
   const startTime = Date.now();
 
   const [group1, group2, group3] = await Promise.all([
-    callClaude(anthropic, prompt1, 4096, "Group1-deepPerception+currentRelationship"),
-    callClaude(anthropic, prompt2, 4096, "Group2-crisis+future"),
-    callClaude(anthropic, prompt3, 4096, "Group3-actionGuide+compatibility+finalMessage"),
+    callClaude(anthropic, prompt1, 4096, `${contentType}-Group1`),
+    callClaude(anthropic, prompt2, 4096, `${contentType}-Group2`),
+    callClaude(anthropic, prompt3, 4096, `${contentType}-Group3`),
   ]);
 
   const elapsed = Date.now() - startTime;
-  console.log(`[Claude API] 3개 그룹 병렬 호출 완료 (${elapsed}ms)`);
+  console.log(`[Claude API][${contentType}] 3개 그룹 병렬 호출 완료 (${elapsed}ms)`);
 
   // 결과 병합
   const interpretation = { ...group1, ...group2, ...group3 };
 
   // 필수 필드 검증
-  const requiredFields = ["deepPerception", "currentRelationship", "crisis", "future", "actionGuide", "compatibility", "finalMessage"];
+  const requiredFields = REQUIRED_FIELDS[contentType] || [];
   const missingFields = requiredFields.filter((field) => !interpretation[field]);
   if (missingFields.length > 0) {
     throw new Error(`응답에 필수 필드가 누락되었습니다: ${missingFields.join(", ")}`);
@@ -473,18 +481,27 @@ router.get("/sessions/:sessionId/purchase-status", authenticateUser, async (req,
   }
 });
 
+// 콘텐츠 타입별 mock 데이터 로더
+const MOCK_DATA = {
+  "mind-reading": "../mocks/mind-reading-premium-response.json",
+  "breakup-reunion": "../mocks/breakup-reunion-premium-response.json",
+};
+
 // 프리미엄 콘텐츠 해석 생성 (USE_MOCK_DATA=true이면 mock, 아니면 Claude API)
 router.post("/generate-interpretation", authenticateUser, async (req, res) => {
   try {
-    const { mindReadingId, cards, userProfile, cardDataContext } = req.body;
+    const { mindReadingId, sessionId, contentType: reqContentType, cards, userProfile, cardDataContext, additionalInput } = req.body;
 
-    if (!mindReadingId) {
-      return res.status(400).json({ success: false, message: "mindReadingId가 필요합니다." });
+    // sessionId 또는 mindReadingId (하위 호환)
+    const id = sessionId || mindReadingId;
+    if (!id) {
+      return res.status(400).json({ success: false, message: "sessionId가 필요합니다." });
     }
 
-    const parsedId = parseInt(mindReadingId);
+    const parsedId = parseInt(id);
+    const contentType = reqContentType || "mind-reading";
 
-    // PremiumContentSession 찾기 또는 MindReading 기반으로 생성
+    // PremiumContentSession 찾기
     let session = null;
 
     if (!isNaN(parsedId)) {
@@ -494,11 +511,11 @@ router.post("/generate-interpretation", authenticateUser, async (req, res) => {
     }
 
     if (!session) {
-      // 같은 사용자의 mind-reading 세션 찾기
+      // 같은 사용자의 해당 콘텐츠 세션 찾기
       session = await prisma.premiumContentSession.findFirst({
         where: {
           userId: req.user.id,
-          contentType: "mind-reading",
+          contentType,
           selectedCard: cards?.card1?.number,
         },
         orderBy: { createdAt: "desc" },
@@ -510,13 +527,13 @@ router.post("/generate-interpretation", authenticateUser, async (req, res) => {
       session = await prisma.premiumContentSession.create({
         data: {
           userId: req.user.id,
-          contentType: "mind-reading",
+          contentType,
           selectedCard: cards?.card1?.number,
           userProfile: userProfile || {},
           status: "IN_PROGRESS",
         },
       });
-      console.log("[generate-interpretation] 새 PremiumContentSession 생성:", session.id);
+      console.log(`[generate-interpretation][${contentType}] 새 PremiumContentSession 생성:`, session.id);
     }
 
     // 이미 결과가 있으면 캐싱된 결과 반환
@@ -529,17 +546,18 @@ router.post("/generate-interpretation", authenticateUser, async (req, res) => {
 
     if (useMock) {
       // Mock 데이터 반환
-      interpretation = require("../mocks/mind-reading-premium-response.json");
-      console.log("[generate-interpretation] Mock 데이터 사용");
+      const mockPath = MOCK_DATA[contentType] || MOCK_DATA["mind-reading"];
+      interpretation = require(mockPath);
+      console.log(`[generate-interpretation][${contentType}] Mock 데이터 사용`);
     } else {
       // 실제 Claude API 호출
-      console.log("[generate-interpretation] Claude API 호출 시작");
+      console.log(`[generate-interpretation][${contentType}] Claude API 호출 시작`);
       const resolvedCardData = cardDataContext || loadCardDataContext(cards);
       try {
-        interpretation = await generateInterpretation(cards, userProfile, resolvedCardData);
-        console.log("[generate-interpretation] Claude API 호출 성공");
+        interpretation = await generateInterpretation(cards, userProfile, resolvedCardData, contentType, additionalInput);
+        console.log(`[generate-interpretation][${contentType}] Claude API 호출 성공`);
       } catch (apiError) {
-        console.error("[generate-interpretation] Claude API 호출 실패:", apiError.message);
+        console.error(`[generate-interpretation][${contentType}] Claude API 호출 실패:`, apiError.message);
         return res.status(502).json({
           success: false,
           message: "AI 해석 생성에 실패했습니다. 잠시 후 다시 시도해주세요.",
@@ -560,7 +578,7 @@ router.post("/generate-interpretation", authenticateUser, async (req, res) => {
       });
     });
 
-    console.log(`[generate-interpretation] 세션 ${session.id} 결과 저장 완료`);
+    console.log(`[generate-interpretation][${contentType}] 세션 ${session.id} 결과 저장 완료`);
     res.json({ success: true, data: interpretation });
   } catch (error) {
     console.error("Error generating interpretation:", error);
