@@ -38,6 +38,13 @@ function buildPrompt(template, cards, userProfile, cardDataContext, additionalIn
   // 추가 입력 변수 주입 (이별 상황 등)
   prompt = prompt.replace(/\{breakupSituation\}/g, additionalInput?.breakupSituation || "");
 
+  // 반려동물 정보 주입 (pet-fortune)
+  prompt = prompt.replace(/\{petName\}/g, additionalInput?.petName || "우리 아이");
+  prompt = prompt.replace(/\{petType\}/g, additionalInput?.petType || "강아지");
+  prompt = prompt.replace(/\{petGender\}/g, additionalInput?.petGender || "");
+  prompt = prompt.replace(/\{petAge\}/g, additionalInput?.petAge || "");
+  prompt = prompt.replace(/\{topic\}/g, additionalInput?.topic || "");
+
   // 카드 정보 주입 (3장)
   const cardEntries = [
     { key: "card1", card: cards.card1, data: cardDataContext?.card1Data },
@@ -51,6 +58,7 @@ function buildPrompt(template, cards, userProfile, cardDataContext, additionalIn
     if (data) {
       prompt = prompt.replace(new RegExp(`\\{${key}Data\\.CardDescription\\}`, "g"), data.CardDescription || "");
       prompt = prompt.replace(new RegExp(`\\{${key}Data\\.Lover'sPerception\\}`, "g"), data["Lover'sPerception"] || "");
+      prompt = prompt.replace(new RegExp(`\\{${key}Data\\.PetMeaning\\}`, "g"), data.PetMeaning || "");
       prompt = prompt.replace(new RegExp(`\\{${key}Data\\.CardFeeling\\}`, "g"), data.CardFeeling || "");
       prompt = prompt.replace(new RegExp(`\\{${key}Data\\.PositiveKeywords\\}`, "g"), formatArray(data.PositiveKeywords));
       prompt = prompt.replace(new RegExp(`\\{${key}Data\\.NegativeKeywords\\}`, "g"), formatArray(data.NegativeKeywords));
@@ -140,6 +148,7 @@ function loadPromptTemplates(contentType) {
 const REQUIRED_FIELDS = {
   "mind-reading": ["deepPerception", "currentRelationship", "crisis", "future", "actionGuide", "compatibility", "finalMessage"],
   "breakup-reunion": ["breakupAnalysis", "currentFeelings", "reunionPossibility", "healingGuide", "decision", "finalMessage"],
+  "pet-fortune": ["petHeart", "hiddenPersonality", "compatibility", "petFortune", "petHealth", "communicationGuide", "finalMessage"],
 };
 
 // Claude API로 해석 생성 (3개 병렬 호출)
@@ -485,6 +494,7 @@ router.get("/sessions/:sessionId/purchase-status", authenticateUser, async (req,
 const MOCK_DATA = {
   "mind-reading": "../mocks/mind-reading-premium-response.json",
   "breakup-reunion": "../mocks/breakup-reunion-premium-response.json",
+  "pet-fortune": "../mocks/pet-fortune-premium-response.json",
 };
 
 // 프리미엄 콘텐츠 해석 생성 (USE_MOCK_DATA=true이면 mock, 아니면 Claude API)
