@@ -45,6 +45,39 @@ function buildPrompt(template, cards, userProfile, cardDataContext, additionalIn
   prompt = prompt.replace(/\{petAge\}/g, additionalInput?.petAge || "");
   prompt = prompt.replace(/\{topic\}/g, additionalInput?.topic || "");
 
+  // 재물운 정보 주입 (wealth-fortune)
+  const wealthConcernMap = {
+    "income-increase": "수입을 더 늘리고 싶어요",
+    "investment": "투자/재테크가 고민이에요",
+    "saving": "저축과 지출 관리가 어려워요",
+    "career-change": "이직/창업을 고민하고 있어요",
+  };
+  const wealthConcernLabel = wealthConcernMap[additionalInput?.wealthConcern] || additionalInput?.wealthConcern || "";
+  prompt = prompt.replace(/\{wealthConcern\}/g, wealthConcernLabel);
+
+  // 재물운 추가 정보 주입
+  const assetLevelMap = {
+    "debt-only": "빚만 있어요",
+    "0-1000": "0~1000만원",
+    "1000-5000": "1000만원~5000만원",
+    "5000-1억": "5000만원~1억원",
+    "1억-5억": "1억원~5억원",
+    "5억+": "5억원 이상",
+  };
+  const occupationMap = {
+    "office-worker": "회사원",
+    "self-employed": "자영업",
+    "freelancer": "프리랜서",
+    "student": "학생",
+    "public-servant": "공무원",
+    "homemaker": "전업주부",
+    "unemployed": "무직/구직중",
+    "other": "기타",
+  };
+  prompt = prompt.replace(/\{assetLevel\}/g, assetLevelMap[additionalInput?.assetLevel] || additionalInput?.assetLevel || "");
+  prompt = prompt.replace(/\{occupation\}/g, occupationMap[additionalInput?.occupation] || additionalInput?.occupation || "");
+  prompt = prompt.replace(/\{currentWorry\}/g, additionalInput?.currentWorry || "");
+
   // 카드 정보 주입 (3장)
   const cardEntries = [
     { key: "card1", card: cards.card1, data: cardDataContext?.card1Data },
@@ -91,6 +124,20 @@ function loadCardDataContext(cards) {
   };
 }
 
+// JSON 문자열 정제: LLM이 생성한 JSON의 흔한 문제 수정
+function sanitizeJsonString(jsonStr) {
+  // 1. JSON 문자열 값 내부의 이스케이프 안 된 줄바꿈을 \\n으로 교체
+  //    "key": "value with
+  //    newline" → "key": "value with\\nnewline"
+  let result = jsonStr.replace(/"([^"]*?)"/gs, (match) => {
+    // 문자열 값 내부의 실제 줄바꿈을 이스케이프된 \n으로 변환
+    return match.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t");
+  });
+  // 2. 트레일링 콤마 제거: ,] 또는 ,} 패턴
+  result = result.replace(/,\s*([\]}])/g, "$1");
+  return result;
+}
+
 // 단일 Claude API 호출 (재시도 포함)
 async function callClaude(anthropic, prompt, maxTokens, groupName) {
   const MAX_RETRIES = 3;
@@ -113,10 +160,11 @@ async function callClaude(anthropic, prompt, maxTokens, groupName) {
       const responseText = message.content[0].text;
 
       const jsonMatch = responseText.match(/```json\s*([\s\S]*?)```/) || responseText.match(/\{[\s\S]*\}/);
-      const jsonStr = jsonMatch
+      const rawJsonStr = jsonMatch
         ? (jsonMatch[1] || jsonMatch[0]).trim()
         : responseText.trim();
 
+      const jsonStr = sanitizeJsonString(rawJsonStr);
       const parsed = JSON.parse(jsonStr);
       console.log(`[Claude API][${groupName}] 호출 성공 (시도 ${attempt})`);
       return parsed;
@@ -137,11 +185,17 @@ async function callClaude(anthropic, prompt, maxTokens, groupName) {
 // 콘텐츠 타입별 프롬프트 로더
 function loadPromptTemplates(contentType) {
   const prefix = contentType;
-  return {
+  const templates = {
     group1: fs.readFileSync(path.join(__dirname, `../prompts/${prefix}-premium-group1.txt`), "utf-8"),
     group2: fs.readFileSync(path.join(__dirname, `../prompts/${prefix}-premium-group2.txt`), "utf-8"),
     group3: fs.readFileSync(path.join(__dirname, `../prompts/${prefix}-premium-group3.txt`), "utf-8"),
   };
+  // wealth-fortune은 4개 그룹 사용
+  const group4Path = path.join(__dirname, `../prompts/${prefix}-premium-group4.txt`);
+  if (fs.existsSync(group4Path)) {
+    templates.group4 = fs.readFileSync(group4Path, "utf-8");
+  }
+  return templates;
 }
 
 // 콘텐츠 타입별 필수 필드 검증
@@ -149,33 +203,38 @@ const REQUIRED_FIELDS = {
   "mind-reading": ["deepPerception", "currentRelationship", "crisis", "future", "actionGuide", "compatibility", "finalMessage"],
   "breakup-reunion": ["breakupAnalysis", "currentFeelings", "reunionPossibility", "healingGuide", "decision", "finalMessage"],
   "pet-fortune": ["petHeart", "hiddenPersonality", "compatibility", "petFortune", "petHealth", "communicationGuide", "finalMessage"],
+  "wealth-fortune": ["canBeRich", "wealthPartner", "moneyTiming", "portfolio", "wealthUsage", "finalMessage"],
 };
 
-// Claude API로 해석 생성 (3개 병렬 호출)
+// Claude API로 해석 생성 (병렬 호출)
 async function generateInterpretation(cards, userProfile, cardDataContext, contentType = "mind-reading", additionalInput = {}) {
   const anthropic = new Anthropic();
 
   // 콘텐츠 타입별 프롬프트 로드
   const templates = loadPromptTemplates(contentType);
 
-  const prompt1 = buildPrompt(templates.group1, cards, userProfile, cardDataContext, additionalInput);
-  const prompt2 = buildPrompt(templates.group2, cards, userProfile, cardDataContext, additionalInput);
-  const prompt3 = buildPrompt(templates.group3, cards, userProfile, cardDataContext, additionalInput);
+  const prompts = [
+    buildPrompt(templates.group1, cards, userProfile, cardDataContext, additionalInput),
+    buildPrompt(templates.group2, cards, userProfile, cardDataContext, additionalInput),
+    buildPrompt(templates.group3, cards, userProfile, cardDataContext, additionalInput),
+  ];
+  if (templates.group4) {
+    prompts.push(buildPrompt(templates.group4, cards, userProfile, cardDataContext, additionalInput));
+  }
 
-  console.log(`[Claude API][${contentType}] 3개 그룹 병렬 호출 시작`);
+  const groupCount = prompts.length;
+  console.log(`[Claude API][${contentType}] ${groupCount}개 그룹 병렬 호출 시작`);
   const startTime = Date.now();
 
-  const [group1, group2, group3] = await Promise.all([
-    callClaude(anthropic, prompt1, 4096, `${contentType}-Group1`),
-    callClaude(anthropic, prompt2, 4096, `${contentType}-Group2`),
-    callClaude(anthropic, prompt3, 4096, `${contentType}-Group3`),
-  ]);
+  const results = await Promise.all(
+    prompts.map((prompt, i) => callClaude(anthropic, prompt, 4096, `${contentType}-Group${i + 1}`))
+  );
 
   const elapsed = Date.now() - startTime;
-  console.log(`[Claude API][${contentType}] 3개 그룹 병렬 호출 완료 (${elapsed}ms)`);
+  console.log(`[Claude API][${contentType}] ${groupCount}개 그룹 병렬 호출 완료 (${elapsed}ms)`);
 
   // 결과 병합
-  const interpretation = { ...group1, ...group2, ...group3 };
+  const interpretation = Object.assign({}, ...results);
 
   // 필수 필드 검증
   const requiredFields = REQUIRED_FIELDS[contentType] || [];
@@ -495,6 +554,7 @@ const MOCK_DATA = {
   "mind-reading": "../mocks/mind-reading-premium-response.json",
   "breakup-reunion": "../mocks/breakup-reunion-premium-response.json",
   "pet-fortune": "../mocks/pet-fortune-premium-response.json",
+  "wealth-fortune": "../mocks/wealth-fortune-premium-response.json",
 };
 
 // 프리미엄 콘텐츠 해석 생성 (USE_MOCK_DATA=true이면 mock, 아니면 Claude API)
