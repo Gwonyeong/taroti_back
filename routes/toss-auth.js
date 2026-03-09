@@ -231,6 +231,7 @@ router.get("/toss/user", async (req, res) => {
         tossGender: user.tossGender,
         mbti: user.mbti,
         adFree: !!adFreePurchase,
+        cloverBalance: user.cloverBalance,
       },
     });
   } catch (error) {

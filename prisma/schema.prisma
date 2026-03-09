@@ -95,6 +95,9 @@ model User {
   tossLastLogin     DateTime?           // 마지막 토스 로그인 시간
   tossLoggedOut     Boolean  @default(false)  // 토스 연결 해제 상태
 
+  // 클로버 재화
+  cloverBalance     Int      @default(0)
+
   mindReadings      MindReading[]
   decemberFortunes  DecemberFortune[]
   newYearFortunes2026 NewYearFortune2026[]
@@ -102,6 +105,8 @@ model User {
   purchases         Purchase[]
   pointRewards      PointReward[]
   premiumContentSessions PremiumContentSession[]
+  cloverTransactions CloverTransaction[]
+  viralShareLogs    ViralShareLog[]
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -582,4 +587,35 @@ model PointReward {
   // 하루에 한 번만 지급 가능하도록 복합 유니크 인덱스
   @@unique([userId, rewardDate, rewardType])
   @@map("point_rewards")
+}
+
+// 클로버 거래 내역 모델
+model CloverTransaction {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  amount          Int                 // 거래 수량 (양수: 지급, 음수: 차감)
+  type            String              // EARN, SPEND
+  reason          String              // 거래 사유 (예: "출석 보상", "프리미엄 콘텐츠 구매")
+  balanceAfter    Int                 // 거래 후 잔액
+
+  createdAt       DateTime @default(now())
+
+  @@map("clover_transactions")
+}
+
+// 공유 리워드 (contactsViral) 기록
+model ViralShareLog {
+  id               Int      @id @default(autoincrement())
+  userId           Int
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moduleId         String
+  sentRewardsCount Int      // 이번 세션에서 공유한 친구 수
+  sentRewardAmount Int?     // 이번 세션에서 지급된 총 리워드
+  rewardUnit       String?  // 리워드 단위 (포인트 등)
+  closeReason      String?  // clickBackButton | noReward
+  createdAt        DateTime @default(now())
+
+  @@map("viral_share_logs")
 }
