@@ -83,6 +83,8 @@ model User {
   gender            String?
   mbti              String?
   birthDate         String?
+  birthCalendarType String   @default("solar")  // "solar" (양력) 또는 "lunar" (음력)
+  birthTime         String?                      // 태어난 시간 (예: "13:30"), null 허용
 
   // 토스 로그인 관련 필드
   tossUserKey       String?  @unique    // 토스 사용자 고유 키

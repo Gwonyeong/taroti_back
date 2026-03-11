@@ -230,6 +230,8 @@ router.get("/toss/user", async (req, res) => {
         tossBirthday: user.tossBirthday,
         tossGender: user.tossGender,
         mbti: user.mbti,
+        birthCalendarType: user.birthCalendarType,
+        birthTime: user.birthTime,
         adFree: !!adFreePurchase,
         cloverBalance: user.cloverBalance,
       },
@@ -280,7 +282,7 @@ router.post("/toss/logout", async (req, res) => {
  */
 router.put("/profile", authenticateTossToken, async (req, res) => {
   try {
-    const { birthDate, gender, mbti } = req.body;
+    const { birthDate, gender, mbti, birthCalendarType, birthTime } = req.body;
     const userId = req.user.userId;
 
     // 업데이트할 데이터 구성
@@ -288,6 +290,8 @@ router.put("/profile", authenticateTossToken, async (req, res) => {
     if (birthDate !== undefined) updateData.birthDate = birthDate;
     if (gender !== undefined) updateData.gender = gender;
     if (mbti !== undefined) updateData.mbti = mbti;
+    if (birthCalendarType !== undefined) updateData.birthCalendarType = birthCalendarType;
+    if (birthTime !== undefined) updateData.birthTime = birthTime;
 
     // DB 업데이트
     const user = await prisma.user.update({
@@ -303,6 +307,8 @@ router.put("/profile", authenticateTossToken, async (req, res) => {
         birthDate: user.birthDate,
         gender: user.gender,
         mbti: user.mbti,
+        birthCalendarType: user.birthCalendarType,
+        birthTime: user.birthTime,
       },
     });
   } catch (error) {
