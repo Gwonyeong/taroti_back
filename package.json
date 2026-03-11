@@ -37,6 +37,7 @@
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.552.0",
+    "manseryeok": "^1.0.1",
     "multer": "^2.0.2",
     "node-cron": "^4.2.1",
     "playwright": "^1.57.0",

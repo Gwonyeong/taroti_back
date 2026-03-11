@@ -177,10 +177,18 @@ router.post('/', async (req, res) => {
     } = req.body;
 
     // 필수 필드 검증
-    if (!templateKey || !title || !messageScenarios || !characterInfo || !cardConfig) {
+    if (!templateKey || !title || !messageScenarios || !characterInfo) {
       return res.status(400).json({
         success: false,
-        message: '필수 필드가 누락되었습니다. (templateKey, title, messageScenarios, characterInfo, cardConfig)'
+        message: '필수 필드가 누락되었습니다. (templateKey, title, messageScenarios, characterInfo)'
+      });
+    }
+
+    // 사주 타입이 아닌 경우 cardConfig 필수
+    if (type !== 'saju' && !cardConfig) {
+      return res.status(400).json({
+        success: false,
+        message: '카드 설정이 필요합니다. (cardConfig)'
       });
     }
 
@@ -216,7 +224,7 @@ router.post('/', async (req, res) => {
         messageScenarios: JSON.stringify(messageScenarios),
         requiredFields: JSON.stringify(requiredFields),
         characterInfo: JSON.stringify(characterInfo),
-        cardConfig: JSON.stringify(cardConfig),
+        cardConfig: JSON.stringify(cardConfig || {}),
         fortuneSettings: fortuneSettings ? JSON.stringify(fortuneSettings) : null,
         resultTemplateData: resultTemplateData ? JSON.stringify(resultTemplateData) : null,
         apiEndpoint,

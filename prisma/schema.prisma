@@ -109,10 +109,42 @@ model User {
   premiumContentSessions PremiumContentSession[]
   cloverTransactions CloverTransaction[]
   viralShareLogs    ViralShareLog[]
+  saju              UserSaju?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
   @@map("users")
+}
+
+// 사주팔자 계산 결과 (User 1:1)
+model UserSaju {
+  id               Int      @id @default(autoincrement())
+  userId           Int      @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 사주팔자 전체 결과
+  fourPillars      Json     // { year: '임신', month: '경술', day: '계유', hour: '을묘' }
+  fourPillarsHanja Json?    // { year: { korean: '임신', hanja: '壬申' }, ... }
+
+  // 오행 분석
+  dominantElement  String   // 가장 강한 오행 (목/화/토/금/수)
+  elementProfile   Json     // { 목: 2, 화: 1, 토: 1, 금: 3, 수: 1 }
+
+  // 음양 분석
+  yinYangProfile   Json     // { 음: 5, 양: 3 }
+
+  // 일주 기본 정보
+  dayElement       Json     // { stem: '수', branch: '금' }
+  dayYinYang       Json     // { stem: '음', branch: '음' }
+
+  // 계산 원본 입력값 (변경 감지용)
+  calculatedFrom   Json     // { year, month, day, hour, minute, isLunar, birthTime }
+  calculatedAt     DateTime @default(now())
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("user_saju")
 }
 
 // 인앱 구매 기록 모델
@@ -508,9 +540,9 @@ model FortuneSession {
   user            User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // 세션 데이터
-  selectedCard    Int
+  selectedCard    Int?                // 선택한 카드 번호 (사주 타입은 null)
   fortuneData     Json?               // 운세 결과 데이터
-  sessionMetadata Json?               // 추가 메타데이터 (fortuneType 등)
+  sessionMetadata Json?               // 추가 메타데이터 (fortuneType, sajuInputs 등)
 
   // 🆕 사용자 프로필 스냅샷 (비로그인 사용자용)
   userProfileSnapshot Json?           // { birthDate, gender, mbti } 등 입력받은 정보

@@ -1210,6 +1210,11 @@ lucide-react@^0.552.0:
   resolved "https://registry.npmjs.org/lucide-react/-/lucide-react-0.552.0.tgz"
   integrity sha512-g9WCjmfwqbexSnZE+2cl21PCfXOcqnGeWeMTNAOGEfpPbm/ZF4YIq77Z8qWrxbu660EKuLB4nSLggoKnCb+isw==
 
+manseryeok@^1.0.1:
+  version "1.0.1"
+  resolved "https://registry.npmjs.org/manseryeok/-/manseryeok-1.0.1.tgz"
+  integrity sha512-5NDPXQYAHlc60fn9nHolKhRAGicHLfNRUEziSVdTV3uAazI0wJF9PU4NuCbqLk672WN5NK54yKZyXbWHK2RWWA==
+
 math-intrinsics@^1.1.0:
   version "1.1.0"
   resolved "https://registry.npmjs.org/math-intrinsics/-/math-intrinsics-1.1.0.tgz"

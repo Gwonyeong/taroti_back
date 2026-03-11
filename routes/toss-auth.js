@@ -10,6 +10,7 @@ const router = express.Router();
 const jwt = require("jsonwebtoken");
 const { getTossClient } = require("../lib/tossClient");
 const { tossDecrypt } = require("../lib/tossDecrypt");
+const { ensureUserSaju } = require("../utils/sajuCalculator");
 
 // Prisma는 server.js에서 전달받음
 let prisma = null;
@@ -218,6 +219,21 @@ router.get("/toss/user", async (req, res) => {
       },
     });
 
+    // 6. 생년월일이 있으면 사주 자동 계산 (없을 때만)
+    const birthDate = user.birthDate || user.tossBirthday;
+    if (birthDate) {
+      ensureUserSaju(prisma, user.id, {
+        birthDate,
+        birthCalendarType: user.birthCalendarType,
+        birthTime: user.birthTime,
+      }).catch((err) => console.error("사주 계산 오류:", err));
+    }
+
+    // 7. 사주 데이터 조회
+    const userSaju = await prisma.userSaju.findUnique({
+      where: { userId: user.id },
+    });
+
     res.json({
       resultType: "SUCCESS",
       success: decryptedUserInfo,
@@ -234,6 +250,17 @@ router.get("/toss/user", async (req, res) => {
         birthTime: user.birthTime,
         adFree: !!adFreePurchase,
         cloverBalance: user.cloverBalance,
+        saju: userSaju
+          ? {
+              fourPillars: userSaju.fourPillars,
+              fourPillarsHanja: userSaju.fourPillarsHanja,
+              dominantElement: userSaju.dominantElement,
+              elementProfile: userSaju.elementProfile,
+              yinYangProfile: userSaju.yinYangProfile,
+              dayElement: userSaju.dayElement,
+              dayYinYang: userSaju.dayYinYang,
+            }
+          : null,
       },
     });
   } catch (error) {
@@ -299,6 +326,20 @@ router.put("/profile", authenticateTossToken, async (req, res) => {
       data: updateData,
     });
 
+    // 생년월일이 있으면 사주 자동 계산/갱신
+    let userSaju = null;
+    if (user.birthDate) {
+      try {
+        userSaju = await ensureUserSaju(prisma, userId, {
+          birthDate: user.birthDate,
+          birthCalendarType: user.birthCalendarType,
+          birthTime: user.birthTime,
+        });
+      } catch (err) {
+        console.error("사주 계산 오류:", err);
+      }
+    }
+
     res.json({
       success: true,
       message: "프로필이 업데이트되었습니다.",
@@ -309,6 +350,17 @@ router.put("/profile", authenticateTossToken, async (req, res) => {
         mbti: user.mbti,
         birthCalendarType: user.birthCalendarType,
         birthTime: user.birthTime,
+        saju: userSaju
+          ? {
+              fourPillars: userSaju.fourPillars,
+              fourPillarsHanja: userSaju.fourPillarsHanja,
+              dominantElement: userSaju.dominantElement,
+              elementProfile: userSaju.elementProfile,
+              yinYangProfile: userSaju.yinYangProfile,
+              dayElement: userSaju.dayElement,
+              dayYinYang: userSaju.dayYinYang,
+            }
+          : null,
       },
     });
   } catch (error) {

@@ -1,5 +1,6 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
+const { ensureUserSaju } = require('../utils/sajuCalculator');
 
 const router = express.Router();
 
@@ -49,7 +50,8 @@ router.post('/template/:templateKey', authenticateOptionalToken, async (req, res
     const {
       selectedCard,
       userProfileData, // { birthDate, gender, mbti }
-      fortuneType
+      fortuneType,
+      sajuInputs // { birthDate, birthCalendarType, birthTime } - 사주 전용
     } = req.body;
 
     // 템플릿 조회
@@ -104,7 +106,9 @@ router.post('/template/:templateKey', authenticateOptionalToken, async (req, res
           data: {
             birthDate: userProfileData.birthDate || undefined,
             gender: userProfileData.gender || undefined,
-            mbti: userProfileData.mbti || undefined
+            mbti: userProfileData.mbti || undefined,
+            birthCalendarType: userProfileData.birthCalendarType || undefined,
+            birthTime: userProfileData.birthTime || undefined
           }
         });
       }
@@ -114,12 +118,13 @@ router.post('/template/:templateKey', authenticateOptionalToken, async (req, res
         data: {
           templateId: template.id,
           userId,
-          selectedCard,
+          selectedCard: selectedCard ?? null,
           isAnonymous,
           userProfileSnapshot: userProfileSnapshot ? JSON.stringify(userProfileSnapshot) : null,
           sessionMetadata: JSON.stringify({
             fortuneType: fortuneType || template.title,
-            templateKey
+            templateKey,
+            sajuInputs: sajuInputs || null
           })
         }
       });
@@ -127,11 +132,36 @@ router.post('/template/:templateKey', authenticateOptionalToken, async (req, res
       return session;
     });
 
+    // 사주 타입이면 사주 계산 트리거
+    let sajuData = null;
+    if (template.type === 'saju' && userId && sajuInputs?.birthDate) {
+      try {
+        const sajuResult = await ensureUserSaju(prisma, userId, {
+          birthDate: sajuInputs.birthDate,
+          birthCalendarType: sajuInputs.birthCalendarType || 'solar',
+          birthTime: sajuInputs.birthTime || null,
+        });
+        if (sajuResult) {
+          sajuData = {
+            fourPillars: sajuResult.fourPillars,
+            dominantElement: sajuResult.dominantElement,
+            elementProfile: sajuResult.elementProfile,
+            yinYangProfile: sajuResult.yinYangProfile,
+            dayElement: sajuResult.dayElement,
+            dayYinYang: sajuResult.dayYinYang,
+          };
+        }
+      } catch (err) {
+        console.error('사주 계산 오류:', err);
+      }
+    }
+
     res.status(201).json({
       success: true,
       message: '운세 세션이 생성되었습니다.',
       sessionId: result.id,
-      fortuneId: result.id // 기존 호환성을 위해
+      fortuneId: result.id, // 기존 호환성을 위해
+      sajuData // 사주 타입이면 계산 결과 포함
     });
 
   } catch (error) {
@@ -452,11 +482,20 @@ router.get('/user/:userId/calendar', async (req, res) => {
 router.get('/user/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    const { limit = '20', offset = '0' } = req.query;
+    const { limit = '20', offset = '0', type, excludeType } = req.query;
+
+    const where = { userId: parseInt(userId) };
+
+    // type 필터: 템플릿 타입으로 필터링 (saju, default, mini 등)
+    if (type) {
+      where.template = { type };
+    } else if (excludeType) {
+      where.template = { type: { not: excludeType } };
+    }
 
     const [sessions, totalCount] = await Promise.all([
       prisma.fortuneSession.findMany({
-        where: { userId: parseInt(userId) },
+        where,
         include: {
           template: {
             select: {
@@ -466,6 +505,7 @@ router.get('/user/:userId', async (req, res) => {
               description: true,
               imageUrl: true,
               category: true,
+              type: true,
               cardConfig: true,
               fortuneSettings: true,
               resultTemplateData: true,
@@ -477,7 +517,7 @@ router.get('/user/:userId', async (req, res) => {
         take: parseInt(limit),
         skip: parseInt(offset)
       }),
-      prisma.fortuneSession.count({ where: { userId: parseInt(userId) } })
+      prisma.fortuneSession.count({ where })
     ]);
 
     // JSON 필드 파싱
