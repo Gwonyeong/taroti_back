@@ -1,4 +1,7 @@
-const { calculateFourPillars } = require("manseryeok");
+let calculateFourPillars;
+const manseryeokReady = import("manseryeok").then((mod) => {
+  calculateFourPillars = mod.calculateFourPillars;
+});
 
 // 십이시진 → hour 매핑
 const birthTimeToHour = {
@@ -24,7 +27,8 @@ const birthTimeToHour = {
  * @param {string|null} params.birthTime - 십이시진 ("자시"~"해시") 또는 null
  * @returns {Object} UserSaju 모델에 저장할 데이터
  */
-function calculateSaju({ birthDate, birthCalendarType, birthTime }) {
+async function calculateSaju({ birthDate, birthCalendarType, birthTime }) {
+  await manseryeokReady;
   const date = new Date(birthDate);
   const year = date.getFullYear();
   const month = date.getMonth() + 1;
@@ -134,7 +138,7 @@ async function ensureUserSaju(prisma, userId, { birthDate, birthCalendarType, bi
     }
   }
 
-  const sajuData = calculateSaju({ birthDate, birthCalendarType, birthTime });
+  const sajuData = await calculateSaju({ birthDate, birthCalendarType, birthTime });
 
   return prisma.userSaju.upsert({
     where: { userId },

@@ -4,7 +4,7 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "postinstall": "prisma generate",
+    "postinstall": "prisma generate && node -e \"const fs=require('fs');const p='node_modules/manseryeok/package.json';const j=JSON.parse(fs.readFileSync(p));if(!j.type){j.type='module';fs.writeFileSync(p,JSON.stringify(j,null,2))}\"",
     "build": "prisma generate",
     "start": "node server.js",
     "dev": "pm2 start ecosystem.config.js --watch && pm2 logs",
