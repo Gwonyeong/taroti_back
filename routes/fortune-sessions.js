@@ -134,6 +134,7 @@ router.post('/template/:templateKey', authenticateOptionalToken, async (req, res
 
     // 사주 타입이면 사주 계산 트리거
     let sajuData = null;
+    let sajuVariationIndex = null;
     if (template.type === 'saju' && userId && sajuInputs?.birthDate) {
       try {
         const sajuResult = await ensureUserSaju(prisma, userId, {
@@ -150,6 +151,27 @@ router.post('/template/:templateKey', authenticateOptionalToken, async (req, res
             dayElement: sajuResult.dayElement,
             dayYinYang: sajuResult.dayYinYang,
           };
+
+          // 신규 5×10 방식: sajuData가 배열 구조인 경우 랜덤 인덱스 선택
+          const templateData = typeof template.resultTemplateData === 'string'
+            ? JSON.parse(template.resultTemplateData)
+            : template.resultTemplateData;
+          const sajuContent = templateData?.sajuData?.[sajuResult.dominantElement];
+          if (Array.isArray(sajuContent)) {
+            sajuVariationIndex = Math.floor(Math.random() * sajuContent.length);
+            // 세션 메타데이터에 인덱스 저장 (결과 일관성 보장)
+            await prisma.fortuneSession.update({
+              where: { id: result.id },
+              data: {
+                sessionMetadata: JSON.stringify({
+                  fortuneType: fortuneType || template.title,
+                  templateKey,
+                  sajuInputs: sajuInputs || null,
+                  sajuVariationIndex,
+                })
+              }
+            });
+          }
         }
       } catch (err) {
         console.error('사주 계산 오류:', err);
@@ -161,7 +183,8 @@ router.post('/template/:templateKey', authenticateOptionalToken, async (req, res
       message: '운세 세션이 생성되었습니다.',
       sessionId: result.id,
       fortuneId: result.id, // 기존 호환성을 위해
-      sajuData // 사주 타입이면 계산 결과 포함
+      sajuData, // 사주 타입이면 계산 결과 포함
+      sajuVariationIndex, // 신규 5×10 방식일 때 랜덤 인덱스
     });
 
   } catch (error) {
