@@ -1,6 +1,7 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
 const { ensureUserSaju } = require('../utils/sajuCalculator');
+const { authenticateTossToken } = require('./toss-auth');
 
 const router = express.Router();
 
@@ -458,7 +459,7 @@ router.get('/user/:userId/calendar/date', async (req, res) => {
 });
 
 // 캘린더용 운세 기록 날짜 조회 (가벼운 API)
-router.get('/user/:userId/calendar', async (req, res) => {
+router.get('/user/:userId/calendar', authenticateTossToken, async (req, res) => {
   try {
     const { userId } = req.params;
     const { year, month } = req.query; // 선택적: 특정 월만 조회

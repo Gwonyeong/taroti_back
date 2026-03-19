@@ -63,6 +63,12 @@ const authenticateTossToken = async (req, res, next) => {
     }
 
     if (user.tossLoggedOut) {
+      console.log("[authenticateTossToken] tossLoggedOut 감지, userId:", user.id);
+      // 프론트엔드에서 401을 받아 로그아웃 처리하므로, 플래그를 리셋하여 재로그인 가능하도록 함
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { tossLoggedOut: false },
+      });
       return res.status(401).json({ error: "토스 연결이 해제되었습니다." });
     }
 
@@ -589,21 +595,6 @@ router.get("/purchases", authenticateTossToken, async (req, res) => {
  * Basic Auth: taroti
  */
 router.post("/toss-sign-out", async (req, res) => {
-  // Basic Auth 검증
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Basic ")) {
-    return res.status(401).json({ message: "인증이 필요합니다." });
-  }
-
-  const base64Credentials = authHeader.split(" ")[1];
-  const credentials = Buffer.from(base64Credentials, "base64").toString("utf8");
-  // credentials 형식: "username:password" 또는 "taroti" 또는 "taroti:"
-  const expectedCredentials = ["taroti", "taroti:", "taroti:taroti"];
-
-  if (!expectedCredentials.some(expected => credentials === expected || credentials.startsWith("taroti"))) {
-    return res.status(401).json({ message: "인증 실패" });
-  }
-
   const { userKey, referrer } = req.body;
 
   // 유효성 검사
