@@ -418,7 +418,7 @@ router.get("/check-status", async (req, res) => {
  */
 router.post("/purchase/process", authenticateTossToken, async (req, res) => {
   try {
-    const { orderId, sku, amount, mindReadingId } = req.body;
+    const { orderId, sku, amount, mindReadingId, sessionId } = req.body;
     const userId = req.user.userId;
 
     if (!orderId || !sku) {
@@ -522,6 +522,92 @@ router.post("/purchase/process", authenticateTossToken, async (req, res) => {
         success: true,
         message: "마인드 리딩 구매가 완료되었습니다.",
         productType: "MIND_READING",
+        purchaseId: purchase.id,
+      });
+    }
+
+    // 재물운 구매 처리
+    const WEALTH_FORTUNE_SKU = process.env.WEALTH_FORTUNE_SKU;
+
+    if (sku === WEALTH_FORTUNE_SKU) {
+      const purchase = await prisma.purchase.create({
+        data: {
+          userId,
+          orderId,
+          sku,
+          productType: "WEALTH_FORTUNE",
+          status: "COMPLETED",
+          amount: amount || null,
+        },
+      });
+
+      if (sessionId) {
+        const parsedId = parseInt(sessionId);
+        if (!isNaN(parsedId)) {
+          try {
+            await prisma.premiumContentSession.update({
+              where: { id: parsedId },
+              data: {
+                isPurchased: true,
+                purchaseId: purchase.id,
+              },
+            });
+            console.log(`PremiumContentSession ${parsedId} isPurchased 업데이트 완료`);
+          } catch (e) {
+            console.error("PremiumContentSession 업데이트 실패:", e.message);
+          }
+        }
+      }
+
+      console.log(`재물운 구매 완료 - userId: ${userId}, orderId: ${orderId}`);
+
+      return res.json({
+        success: true,
+        message: "재물운 구매가 완료되었습니다.",
+        productType: "WEALTH_FORTUNE",
+        purchaseId: purchase.id,
+      });
+    }
+
+    // 재회의 달빛 구매 처리
+    const BREAKUP_REUNION_SKU = process.env.BREAKUP_REUNION_SKU;
+
+    if (sku === BREAKUP_REUNION_SKU) {
+      const purchase = await prisma.purchase.create({
+        data: {
+          userId,
+          orderId,
+          sku,
+          productType: "BREAKUP_REUNION",
+          status: "COMPLETED",
+          amount: amount || null,
+        },
+      });
+
+      if (sessionId) {
+        const parsedId = parseInt(sessionId);
+        if (!isNaN(parsedId)) {
+          try {
+            await prisma.premiumContentSession.update({
+              where: { id: parsedId },
+              data: {
+                isPurchased: true,
+                purchaseId: purchase.id,
+              },
+            });
+            console.log(`PremiumContentSession ${parsedId} isPurchased 업데이트 완료`);
+          } catch (e) {
+            console.error("PremiumContentSession 업데이트 실패:", e.message);
+          }
+        }
+      }
+
+      console.log(`재회의 달빛 구매 완료 - userId: ${userId}, orderId: ${orderId}`);
+
+      return res.json({
+        success: true,
+        message: "재회의 달빛 구매가 완료되었습니다.",
+        productType: "BREAKUP_REUNION",
         purchaseId: purchase.id,
       });
     }
